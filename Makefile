@@ -291,6 +291,15 @@ install_targets-y += install_libplatsbi
 install_targets-y += install_firmwares
 endif
 
+# Convenient "make run" command for emulated platforms
+.PHONY: run
+run: all
+ifneq ($(platform-runcmd),)
+	$(platform-runcmd)
+else
+	echo No run command for platform $(PLATFORM)
+endif
+
 # Rule for "make install"
 .PHONY: install
 install: $(install_targets-y)
