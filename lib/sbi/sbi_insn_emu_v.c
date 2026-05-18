@@ -15,6 +15,7 @@
 
 #include <sbi/riscv_encoding.h>
 #include <sbi/sbi_illegal_insn.h>
+#include <sbi/sbi_insn_emu_pmu.h>
 #include <sbi/sbi_trap.h>
 
 /* we need a buffer size of eight times VLEN bits */
@@ -1139,6 +1140,11 @@ int sbi_insn_emu_op_v(ulong insn, struct sbi_trap_regs *regs)
 	}
 
 	regs->mepc += 4;
+
+	/* Count the successful Zvbb emulation. Failures within this
+	 * function fall through to truly_illegal_insn() which is
+	 * counted as UNHANDLED via the same PMU hook. */
+	sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_ZVBB);
 
 	return 0;
 }

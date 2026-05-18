@@ -36,7 +36,7 @@
 /* "BPMU" stored little-endian. The host validates this byte-for-byte
  * before trusting the rest of the struct. */
 #define BHX_EMU_PMU_MAGIC	0x554d5042u
-#define BHX_EMU_PMU_VERSION	1u
+#define BHX_EMU_PMU_VERSION	2u
 
 /* Upper bound on hartid we track. X280 has 1 hart per L2CPU so a
  * given firmware image only ever sees hartid == 0; sized generously

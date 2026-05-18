@@ -72,3 +72,14 @@ CONFIG_FDT_MPXY_RPMI_VOLTAGE=y
 CONFIG_FDT_MPXY_RPMI_DEVICE_POWER=y
 CONFIG_FDT_MPXY_RPMI_PERFORMANCE=y
 CONFIG_FDT_MPXY_RPMI_SYSMSI=y
+
+# bhx: trap-based ISA-extension emulation (Freisen v3 2/3 + 3/3).
+# Covers the RVA22 -> RVA23U64 scalar + Zvbb vector gap so stock
+# RVA23-mandatory distros (Ubuntu 26.04 / glibc-RVA23) boot on the
+# X280 (RVV 1.0 without Zvbb, RVA22-class scalar). See bhx#163.
+CONFIG_SBI_ISA_EXT_EMU=y
+CONFIG_EMU_RVB23=y
+CONFIG_EMU_ZBC=y
+CONFIG_EMU_SUPM=y
+CONFIG_EMU_ZVBB=y
+CONFIG_EMU_ZVBB_VLEN_512=y

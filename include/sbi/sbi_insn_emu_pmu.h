@@ -56,6 +56,10 @@ enum sbi_insn_emu_ext {
 	 * Zvbc, …) is needed.
 	 */
 	SBI_INSN_EMU_EXT_UNHANDLED	= 16,
+	/* Vector Basic Bit-manipulation — Freisen v3 3/3. Gating
+	 * extension for stock RVA23U64 userspaces (Ubuntu 26.04 /
+	 * glibc-RVA23) on the X280, which has RVV 1.0 but no Zvbb. */
+	SBI_INSN_EMU_EXT_ZVBB		= 17,
 	SBI_INSN_EMU_EXT_MAX
 };
 
