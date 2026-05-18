@@ -247,7 +247,7 @@ int sbi_insn_emu_op(ulong insn, struct sbi_trap_regs *regs)
 	case INSN_MATCH_CLMULH:
 		matched_ext = SBI_INSN_EMU_EXT_ZBC;
 		rd_val = 0;
-		for (int i = 1; i <= __riscv_xlen; i++) {
+		for (int i = 1; i < __riscv_xlen; i++) {
 			if ((rs2_val >> i) & 1)
 				rd_val ^= rs1_val >> (__riscv_xlen - i);
 		}
