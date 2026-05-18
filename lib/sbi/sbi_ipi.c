@@ -209,6 +209,23 @@ static struct sbi_ipi_event_ops ipi_smode_ops = {
 
 static u32 ipi_smode_event = SBI_IPI_EVENT_MAX;
 
+/* (bhx#166 Phase 5) Address of a hart's ipi_type bitmap. Used by the
+ * patched generic platform's bhx-purgatory hook to publish the PA so
+ * the PCIe host can drive a force-park IPI without going through
+ * sbi_ipi_send_many (which is M-mode only). */
+unsigned long *sbi_ipi_data_addr(u32 hartindex)
+{
+	struct sbi_scratch *scratch;
+	struct sbi_ipi_data *ipi_data;
+
+	scratch = sbi_hartindex_to_scratch(hartindex);
+	if (!scratch || !ipi_data_off)
+		return NULL;
+
+	ipi_data = sbi_scratch_offset_ptr(scratch, ipi_data_off);
+	return &ipi_data->ipi_type;
+}
+
 int sbi_ipi_send_smode(ulong hmask, ulong hbase)
 {
 	return sbi_ipi_send_many(hmask, hbase, ipi_smode_event, NULL);

@@ -84,6 +84,15 @@ int sbi_ipi_send_smode(ulong hmask, ulong hbase);
 
 void sbi_ipi_clear_smode(void);
 
+/* (bhx#166 Phase 5) Address of a hart's ipi_type bitmap. The PCIe
+ * host writes `1ULL << event_index` to this address (no concurrent
+ * IPI sender → no atomic-OR needed) and then writes `1` to the hart's
+ * CLINT MSIP to deliver the M-mode software interrupt. OpenSBI's
+ * trap handler dispatches via the standard sbi_ipi_process() path
+ * to the registered event's `process` callback. Returns NULL if the
+ * hartindex is invalid or sbi_ipi_init() hasn't been called yet. */
+unsigned long *sbi_ipi_data_addr(u32 hartindex);
+
 int sbi_ipi_send_halt(ulong hmask, ulong hbase);
 
 void sbi_ipi_process(void);

@@ -83,6 +83,25 @@ int sbi_hsm_hart_get_state(const struct sbi_domain *dom, u32 hartid)
 	return __sbi_hsm_hart_get_state(hartindex);
 }
 
+/* (bhx#166 Phase 4) Address of a hart's HSM state atomic_t. Lives in
+ * the per-hart sbi_scratch at file-static `hart_data_offset` plus the
+ * `state` member offset (zero — it's the first field of struct
+ * sbi_hsm_data). Used by the patched generic platform's final_exit
+ * hook to publish the address to the PCIe host so the host can drive
+ * the STOPPED -> START_PENDING transition that wakes a parked hart. */
+void *sbi_hsm_hart_state_addr(u32 hartindex)
+{
+	struct sbi_scratch *scratch;
+	struct sbi_hsm_data *hdata;
+
+	scratch = sbi_hartindex_to_scratch(hartindex);
+	if (!scratch || !hart_data_offset)
+		return NULL;
+
+	hdata = sbi_scratch_offset_ptr(scratch, hart_data_offset);
+	return &hdata->state;
+}
+
 /*
  * Try to acquire the ticket for the given target hart to make sure only
  * one hart prepares the start of the target hart.

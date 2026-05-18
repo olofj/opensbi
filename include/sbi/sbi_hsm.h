@@ -79,6 +79,11 @@ bool sbi_hsm_hart_change_state(struct sbi_scratch *scratch, long oldstate,
 			       long newstate);
 int __sbi_hsm_hart_get_state(u32 hartindex);
 int sbi_hsm_hart_get_state(const struct sbi_domain *dom, u32 hartid);
+/* (bhx#166 Phase 4) Expose the address of a hart's HSM `state` atomic
+ * field. The PCIe host uses this to flip a parked hart's HSM state
+ * from STOPPED to START_PENDING from outside the chip. Returns NULL if
+ * the hartindex is invalid or sbi_hsm_init() hasn't been called yet. */
+void *sbi_hsm_hart_state_addr(u32 hartindex);
 int sbi_hsm_hart_interruptible_mask(const struct sbi_domain *dom,
 				    struct sbi_hartmask *mask);
 void __sbi_hsm_suspend_non_ret_save(struct sbi_scratch *scratch);
