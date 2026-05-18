@@ -164,12 +164,56 @@ static const struct sbi_pmu_device bhx_emu_pmu = {
 
 /*
  * Strong override of the generic sbi_insn_emu_pmu_init() hook.
- * Registers the bhx PMU device with the SBI PMU core. The publish
- * struct itself is statically initialized in BSS so cold + warm
- * reentry just re-points sbi_pmu's device pointer at us.
+ *
+ * Zeros the current hart's slot of the publish struct and registers
+ * the bhx PMU device with the SBI PMU core. The zeroing is
+ * important on the *warm-reboot* path (guest reboot through
+ * bhx-purgatory release): OpenSBI's _start_warm doesn't clear .bss
+ * or reload .data, so without this each guest reboot would inherit
+ * the previous boot's counts and first-unhandled capture. With it,
+ * every boot — cold or warm — starts the per-boot stats clean.
+ *
+ * Cold init still works because the publish struct's header
+ * (magic/version/max_harts/max_events) is statically initialized
+ * in .data and never touched by this function. Only the per-hart
+ * count + capture state moves.
  */
 int sbi_insn_emu_pmu_init(void)
 {
+	u32 hartid = current_hartid();
+	int i;
+
+	if (hartid < BHX_EMU_PMU_MAX_HARTS) {
+		for (i = 0; i < SBI_INSN_EMU_EXT_MAX; i++)
+			bhx_emu_pmu_publish.counts[hartid][i] = 0;
+		for (i = 0; i < SBI_PMU_FW_CTR_MAX; i++)
+			bhx_emu_pmu_publish.ctr_to_event[hartid][i] = 0;
+		bhx_emu_pmu_publish.first_unhandled_insn[hartid] = 0;
+		bhx_emu_pmu_publish.first_unhandled_mepc[hartid] = 0;
+	}
 	sbi_pmu_set_device(&bhx_emu_pmu);
 	return 0;
+}
+
+/*
+ * Capture the first-unhandled instruction encoding for this hart.
+ * Called from truly_illegal_insn() right after the UNHANDLED bump.
+ *
+ * "First" rather than "last" because the operator's most common
+ * question is "which insn killed my boot" — and once a critical
+ * tool crashes, the kernel may cascade through dozens more SIGILLs
+ * on cleanup paths that aren't the root cause. We write only when
+ * the slot is still zero. Reset by sbi_insn_emu_pmu_init() so it
+ * reflects "this boot."
+ */
+void sbi_insn_emu_pmu_capture_unhandled(ulong insn, ulong mepc)
+{
+	u32 hartid = current_hartid();
+
+	if (hartid >= BHX_EMU_PMU_MAX_HARTS)
+		return;
+	if (bhx_emu_pmu_publish.first_unhandled_insn[hartid] != 0)
+		return;
+	bhx_emu_pmu_publish.first_unhandled_insn[hartid] = insn;
+	bhx_emu_pmu_publish.first_unhandled_mepc[hartid] = mepc;
 }

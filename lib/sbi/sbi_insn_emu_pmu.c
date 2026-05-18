@@ -22,3 +22,10 @@ __attribute__((weak)) int sbi_insn_emu_pmu_init(void)
 {
 	return 0;
 }
+
+__attribute__((weak)) void sbi_insn_emu_pmu_capture_unhandled(ulong insn,
+							      ulong mepc)
+{
+	(void)insn;
+	(void)mepc;
+}

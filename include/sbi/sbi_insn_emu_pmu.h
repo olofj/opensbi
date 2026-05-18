@@ -76,6 +76,17 @@ enum sbi_insn_emu_ext {
 void sbi_insn_emu_pmu_inc(int ext);
 
 /*
+ * Capture-hook for illegal-insn traps that reached
+ * truly_illegal_insn() without being emulated. The default weak
+ * implementation is a no-op; a platform-specific PMU device can
+ * override to record the insn encoding + mepc for the operator to
+ * disassemble. Called once per such trap, alongside the UNHANDLED
+ * counter bump. `insn` is the trapped instruction encoding, `mepc`
+ * is the guest PC it lives at.
+ */
+void sbi_insn_emu_pmu_capture_unhandled(ulong insn, ulong mepc);
+
+/*
  * Cold + warm boot hook. Called unconditionally from sbi_init.c
  * after sbi_pmu_init() on both the cold-boot and warm-boot paths.
  * The default weak implementation is a no-op; a platform-specific

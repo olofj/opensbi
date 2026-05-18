@@ -36,7 +36,7 @@
 /* "BPMU" stored little-endian. The host validates this byte-for-byte
  * before trusting the rest of the struct. */
 #define BHX_EMU_PMU_MAGIC	0x554d5042u
-#define BHX_EMU_PMU_VERSION	2u
+#define BHX_EMU_PMU_VERSION	3u
 
 /* Upper bound on hartid we track. X280 has 1 hart per L2CPU so a
  * given firmware image only ever sees hartid == 0; sized generously
@@ -60,6 +60,26 @@ struct bhx_emu_pmu_publish {
 	 * the old scratch-state field; kept here so the published
 	 * struct is self-contained. */
 	int	ctr_to_event[BHX_EMU_PMU_MAX_HARTS][SBI_PMU_FW_CTR_MAX];
+
+	/* Per-hart capture of the first illegal-insn trap that
+	 * truly_illegal_insn() couldn't handle. Useful for "which
+	 * extension's emulator do I need to write next" — the host
+	 * disassembles `first_unhandled_insn` and gets a direct
+	 * answer instead of grepping guest dmesg for SIGILL bytes.
+	 *
+	 * Set once per boot (write only if the slot is still zero)
+	 * so the first sticky failure isn't overwritten by later
+	 * cascading SIGILLs from the same workload.
+	 *
+	 * `first_unhandled_mepc` is the guest PC the instruction
+	 * lives at, useful for cross-referencing against
+	 * /proc/.../maps + objdump output inside the guest.
+	 *
+	 * Both zeroed by sbi_insn_emu_pmu_init() on every hart entry
+	 * (cold + warm reboot), so they reflect "this boot" rather
+	 * than "ever since this fw_jump.bin loaded." */
+	u64	first_unhandled_insn[BHX_EMU_PMU_MAX_HARTS];
+	u64	first_unhandled_mepc[BHX_EMU_PMU_MAX_HARTS];
 };
 
 extern struct bhx_emu_pmu_publish bhx_emu_pmu_publish;

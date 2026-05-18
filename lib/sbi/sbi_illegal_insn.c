@@ -40,6 +40,10 @@ int truly_illegal_insn(ulong insn, struct sbi_trap_regs *regs)
 	 * as successful emulation so userspace `perf` sees ANY,
 	 * per-ext, and UNHANDLED through one event_data namespace. */
 	sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_UNHANDLED);
+	/* Capture the encoding + PC of the first unhandled trap this
+	 * boot so the host can disassemble it without grepping guest
+	 * dmesg. Weak no-op default; bhx PMU device overrides. */
+	sbi_insn_emu_pmu_capture_unhandled(insn, regs->mepc);
 
 	trap.cause = CAUSE_ILLEGAL_INSTRUCTION;
 	trap.tval  = insn;
