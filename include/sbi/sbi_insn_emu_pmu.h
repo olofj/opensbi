@@ -60,6 +60,17 @@ enum sbi_insn_emu_ext {
 	 * extension for stock RVA23U64 userspaces (Ubuntu 26.04 /
 	 * glibc-RVA23) on the X280, which has RVV 1.0 but no Zvbb. */
 	SBI_INSN_EMU_EXT_ZVBB		= 17,
+	/* Vector instruction that trapped with mstatus.VS == 0. This
+	 * is Linux's lazy-vector-enable bounce: the kernel marks new
+	 * tasks with VS=Off and lets the *first* vector insn in each
+	 * task raise illegal-instruction; the kernel's S-mode handler
+	 * then enables VS for the task and retries. These traps reach
+	 * truly_illegal_insn() because the OP-V dispatcher slot routes
+	 * here when the encoding isn't a Zvbb hit, but they aren't
+	 * emulator-coverage gaps — the hardware will execute the same
+	 * insn natively once Linux flips VS on. Counted separately so
+	 * `UNHANDLED` reflects only real misses. */
+	SBI_INSN_EMU_EXT_VS_OFF_BOUNCE	= 18,
 	SBI_INSN_EMU_EXT_MAX
 };
 

@@ -31,19 +31,38 @@
 int truly_illegal_insn(ulong insn, struct sbi_trap_regs *regs)
 {
 	struct sbi_trap_info trap;
+	bool is_vector_op;
+	bool vector_disabled;
 
-	/* Single chokepoint for every illegal-insn the emulator could
-	 * not (or would not) handle — both opcode-table fall-throughs
-	 * (e.g. an OP-V Zvbb insn that lands on a truly_illegal_insn
-	 * slot in illegal_insn_table[]) and inner-decode misses inside
-	 * sbi_insn_emu_*() helpers. Counted via the same PMU plumbing
-	 * as successful emulation so userspace `perf` sees ANY,
-	 * per-ext, and UNHANDLED through one event_data namespace. */
-	sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_UNHANDLED);
-	/* Capture the encoding + PC of the first unhandled trap this
-	 * boot so the host can disassemble it without grepping guest
-	 * dmesg. Weak no-op default; bhx PMU device overrides. */
-	sbi_insn_emu_pmu_capture_unhandled(insn, regs->mepc);
+	/* Classify before counting. Linux's lazy vector-state enable
+	 * leaves new tasks with mstatus.VS == 0; the *first* vector
+	 * instruction in each task raises illegal-instruction even
+	 * though the hardware fully supports the encoding. Those
+	 * bounces reach here because the OP-V dispatcher slot falls
+	 * through to truly_illegal_insn when the encoding isn't a
+	 * Zvbb hit. Counting them as UNHANDLED is misleading — Linux's
+	 * S-mode handler will enable VS and the same insn will retry
+	 * natively. Route them to a dedicated VS_OFF_BOUNCE counter
+	 * and skip the UNHANDLED bump + capture so the operator's
+	 * "what emulator gap is left" view stays clean. */
+	is_vector_op = ((insn & 0x7f) == 0x57);
+	vector_disabled = ((regs->mstatus & MSTATUS_VS) == 0);
+
+	if (is_vector_op && vector_disabled) {
+		sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_VS_OFF_BOUNCE);
+	} else {
+		/* Single chokepoint for every illegal-insn the emulator
+		 * could not (or would not) handle. Counted via the same
+		 * PMU plumbing as successful emulation so userspace
+		 * `perf` sees ANY, per-ext, and UNHANDLED through one
+		 * event_data namespace. */
+		sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_UNHANDLED);
+		/* Capture the encoding + PC of the first unhandled trap
+		 * this boot so the host can disassemble it without
+		 * grepping guest dmesg. Weak no-op default; bhx PMU
+		 * device overrides. */
+		sbi_insn_emu_pmu_capture_unhandled(insn, regs->mepc);
+	}
 
 	trap.cause = CAUSE_ILLEGAL_INSTRUCTION;
 	trap.tval  = insn;
