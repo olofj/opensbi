@@ -46,6 +46,16 @@
 	.globl _start
 	.globl _start_warm
 _start:
+	j	1f
+	/* TT: Place debug_descriptor pointer at a fixed address */
+	.align 7  # Align to 128-byte boundary (0x80)
+	.dword debug_descriptor - _start + FW_TEXT_START
+	/* TT: The zebu snapshot restore code needs 4K * 8 cores space here  */
+	/* each NOP is 2 bytes */
+	.rept 8 * (4096/2)
+	nop
+	.endr
+1:
 	/* Find preferred boot HART id */
 	MOV_3R	s0, a0, s1, a1, s2, a2
 	call	fw_boot_hart
@@ -133,7 +143,13 @@ _bss_zero:
 	/* Override previous arg1 */
 	lla	a1, fw_fdt_bin
 #endif
-
+#ifdef FW_JUMP_FDT_ADDR
+	li	a1, FW_JUMP_FDT_ADDR
+#elif defined(FW_JUMP_FDT_OFFSET)
+	lla	s5, _fw_start
+	li	a1, FW_JUMP_FDT_OFFSET
+	add	a1, s5, a1
+#endif
 	/*
 	 * Initialize platform
 	 * Note: The a0 to a4 registers passed to the

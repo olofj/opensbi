@@ -11,6 +11,7 @@
 #include <platform_override.h>
 #include <sbi/riscv_asm.h>
 #include <sbi/sbi_bitops.h>
+#include <sbi/sbi_console.h>
 #include <sbi/sbi_hartmask.h>
 #include <sbi/sbi_heap.h>
 #include <sbi/sbi_platform.h>
@@ -29,6 +30,7 @@
 #include <sbi_utils/serial/fdt_serial.h>
 #include <sbi_utils/serial/semihosting.h>
 #include <sbi_utils/timer/fdt_timer.h>
+#include <sbi_utils/serial/virtual-uart.h>
 
 /* List of platform override modules generated at compile time */
 extern const struct fdt_driver *const platform_override_modules[];
@@ -225,6 +227,8 @@ int generic_early_init(bool cold_boot)
 			rc = semihosting_init();
 		else
 			rc = fdt_serial_init(fdt);
+		if (rc == SBI_ENODEV)
+			rc = virtual_uart_init();
 		if (rc)
 			return rc;
 

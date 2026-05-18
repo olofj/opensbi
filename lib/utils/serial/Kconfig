@@ -92,4 +92,8 @@ config SERIAL_SEMIHOSTING
 	bool "Semihosting support"
 	default n
 
+config SERIAL_VIRTUAL_UART
+	bool "Virtual UART"
+	default y
+
 endmenu

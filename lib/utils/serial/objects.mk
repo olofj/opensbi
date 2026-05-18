@@ -46,3 +46,4 @@ libsbiutils-objs-$(CONFIG_SERIAL_LITEX) += serial/litex-uart.o
 libsbiutils-objs-$(CONFIG_SERIAL_UART8250) += serial/uart8250.o
 libsbiutils-objs-$(CONFIG_SERIAL_XILINX_UARTLITE) += serial/xlnx-uartlite.o
 libsbiutils-objs-$(CONFIG_SERIAL_SEMIHOSTING) += serial/semihosting.o
+libsbiutils-objs-$(CONFIG_SERIAL_VIRTUAL_UART) += serial/virtual-uart.o

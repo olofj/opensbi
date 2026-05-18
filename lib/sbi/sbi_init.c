@@ -35,6 +35,7 @@
 #include <sbi/sbi_tlb.h>
 #include <sbi/sbi_version.h>
 #include <sbi/sbi_unit_test.h>
+#include <sbi/sbi_debug_descriptor.h>
 
 #define BANNER                                              \
 	"   ____                    _____ ____ _____\n"     \
@@ -45,6 +46,12 @@
 	"  \\____/| .__/ \\___|_| |_|_____/|____/_____|\n"  \
 	"        | |\n"                                     \
 	"        |_|\n\n"
+
+struct debug_descriptor debug_descriptor __attribute__((section(".data"))) = {
+	.eye_catcher = "OSBIdbug",
+	.version = 1,
+	.virtuart_base = -1ULL,
+};
 
 static void sbi_boot_print_banner(struct sbi_scratch *scratch)
 {
