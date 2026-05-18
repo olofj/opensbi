@@ -658,7 +658,7 @@ int sbi_insn_emu_zicbom_zicboz(ulong insn, struct sbi_trap_regs *regs)
 			return truly_illegal_insn(insn, regs);
 
 		u32 *addr =
-			(u32 *)(GET_RS1S(insn, regs) & 0xffffffffffffffc0ull);
+			(u32 *)(GET_RS1(insn, regs) & 0xffffffffffffffc0ull);
 		struct sbi_trap_info uptrap;
 		/* Zero the 64 byte block */
 		for (int i = 0; i < 16; i++) {
