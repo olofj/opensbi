@@ -50,9 +50,17 @@ _start:
 	/* TT: Place debug_descriptor pointer at a fixed address */
 	.align 7  # Align to 128-byte boundary (0x80)
 	.dword debug_descriptor - _start + FW_TEXT_START
+	/* bhx: pointer to the ISA-emulation PMU publish struct. The
+	 * bhx host daemon reads 8 bytes at fw_jump.bin + 0x88 to
+	 * locate `bhx_emu_pmu_publish` in DRAM, then scrapes per-hart
+	 * counter snapshots via PCIe. See
+	 * include/sbi/bhx_emu_pmu_publish.h. */
+	.dword bhx_emu_pmu_publish - _start + FW_TEXT_START
 	/* TT: The zebu snapshot restore code needs 4K * 8 cores space here  */
 	/* each NOP is 2 bytes */
-	.rept 8 * (4096/2)
+	/* 4 NOPs (= 8 bytes) removed to keep total layout size identical
+	 * after adding the bhx_emu_pmu_publish pointer above. */
+	.rept 8 * (4096/2) - 4
 	nop
 	.endr
 1:

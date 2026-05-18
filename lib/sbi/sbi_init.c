@@ -7,6 +7,7 @@
  *   Anup Patel <anup.patel@wdc.com>
  */
 
+#include <sbi/sbi_insn_emu_pmu.h>
 #include <sbi/riscv_asm.h>
 #include <sbi/riscv_atomic.h>
 #include <sbi/riscv_barrier.h>
@@ -287,6 +288,17 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 		sbi_hart_hang();
 	}
 
+	/* (bhx#199) Register the ISA-emulation PMU device after the
+	 * generic PMU is up. Best-effort: if the scratch allocator's
+	 * out of room, we log + continue without counters rather than
+	 * hanging the chip on a non-essential observability path. */
+	rc = sbi_insn_emu_pmu_init();
+	if (rc) {
+		sbi_printf("%s: ISA-emu PMU init failed (error %d) — "
+			   "boot proceeds without emu hit counters\n",
+			   __func__, rc);
+	}
+
 	rc = sbi_dbtr_init(scratch, true);
 	if (rc)
 		sbi_hart_hang();
@@ -442,6 +454,14 @@ static void __noreturn init_warm_startup(struct sbi_scratch *scratch,
 	rc = sbi_pmu_init(scratch, false);
 	if (rc)
 		sbi_hart_hang();
+
+	/* (bhx#199) Per-hart re-init: zero this hart's counter slot
+	 * and re-register the PMU device. The scratch offset was
+	 * allocated by hart 0 during cold-init. */
+	rc = sbi_insn_emu_pmu_init();
+	if (rc)
+		sbi_printf("%s: ISA-emu PMU re-init failed (error %d)\n",
+			   __func__, rc);
 
 	rc = sbi_dbtr_init(scratch, false);
 	if (rc)

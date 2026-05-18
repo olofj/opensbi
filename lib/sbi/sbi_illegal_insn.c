@@ -21,6 +21,7 @@
 #include <sbi/sbi_illegal_insn.h>
 #include <sbi/sbi_insn_emu.h>
 #include <sbi/sbi_insn_emu_fp.h>
+#include <sbi/sbi_insn_emu_pmu.h>
 #include <sbi/sbi_pmu.h>
 #include <sbi/sbi_trap.h>
 #include <sbi/sbi_unpriv.h>
@@ -29,6 +30,15 @@
 int truly_illegal_insn(ulong insn, struct sbi_trap_regs *regs)
 {
 	struct sbi_trap_info trap;
+
+	/* Single chokepoint for every illegal-insn the emulator could
+	 * not (or would not) handle — both opcode-table fall-throughs
+	 * (e.g. an OP-V Zvbb insn that lands on a truly_illegal_insn
+	 * slot in illegal_insn_table[]) and inner-decode misses inside
+	 * sbi_insn_emu_*() helpers. Counted via the same PMU plumbing
+	 * as successful emulation so userspace `perf` sees ANY,
+	 * per-ext, and UNHANDLED through one event_data namespace. */
+	sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_UNHANDLED);
 
 	trap.cause = CAUSE_ILLEGAL_INSTRUCTION;
 	trap.tval  = insn;

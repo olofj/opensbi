@@ -7,6 +7,7 @@
  *   Benedikt Freisen <b.freisen@gmx.net>
  */
 
+#include <sbi/sbi_insn_emu_pmu.h>
 #include <sbi/riscv_encoding.h>
 #include <sbi/riscv_fp.h>
 #include <sbi/sbi_illegal_insn.h>
@@ -27,6 +28,7 @@ int sbi_insn_emu_load_fp(ulong insn, struct sbi_trap_regs *regs)
 	    (insn & INSN_MASK_FLH) == INSN_MATCH_FLH) {
 		tcntx->trap.cause = CAUSE_MISALIGNED_LOAD;
 		tcntx->trap.tval  = GET_RS1(insn, regs) + IMM_I(insn);
+		sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_ZFHMIN);
 		return sbi_misaligned_load_handler(tcntx);
 	}
 
@@ -46,6 +48,7 @@ int sbi_insn_emu_store_fp(ulong insn, struct sbi_trap_regs *regs)
 	    (insn & INSN_MASK_FSH) == INSN_MATCH_FSH) {
 		tcntx->trap.cause = CAUSE_MISALIGNED_LOAD;
 		tcntx->trap.tval  = GET_RS1(insn, regs) + IMM_S(insn);
+		sbi_insn_emu_pmu_inc(SBI_INSN_EMU_EXT_ZFHMIN);
 		return sbi_misaligned_store_handler(tcntx);
 	}
 
@@ -626,6 +629,7 @@ static u16 f16_handle_and_signal_nans(u16 rs1, u16 rs2)
 #if defined(CONFIG_EMU_ZFHMIN) || defined(CONFIG_EMU_ZFA)
 int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 {
+	int matched_ext = SBI_INSN_EMU_EXT_NONE;
 	u64 val;
 	u32 fcsr;
 
@@ -639,11 +643,17 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 #ifdef CONFIG_EMU_ZFHMIN
 	/* Emulate Zfhmin instructions */
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_S_H | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		val = GET_F16_RS1_OR_NAN(insn, regs);
 		val = convert_f16_to_f32(val, &fcsr);
@@ -651,10 +661,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		val  = GET_F32_RS1_OR_NAN(insn, regs);
 		val  = convert_f32_to_f16(val, &fcsr, GET_RM(insn));
@@ -662,6 +677,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVT_H_S | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -671,11 +687,17 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_D_H | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		val = GET_F16_RS1_OR_NAN(insn, regs);
 		val = convert_f16_to_f64(val, &fcsr);
@@ -683,10 +705,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		val  = GET_F64_RS1_OR_NAN(insn, regs);
 		val  = convert_f64_to_f16(val, &fcsr, GET_RM(insn));
@@ -694,6 +721,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVT_H_D | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -703,10 +731,12 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FMV_X_H:
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		val = GET_F16_RS1(insn, regs);
 		SET_RD(insn, regs, (ulong)(long)(s16)(u16)val);
 		break;
 	case INSN_MATCH_FMV_H_X:
+		matched_ext = SBI_INSN_EMU_EXT_ZFHMIN;
 		val = GET_RS1(insn, regs);
 		SET_F16_RD(insn, regs, val);
 		break;
@@ -714,25 +744,33 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 #ifdef CONFIG_EMU_ZFA
 	/* Emulate Zfa instructions */
 	case INSN_MATCH_FLI_H:
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		val = GET_RS1_NUM(insn);
 		val = f16_imm_lut[val];
 		SET_F16_RD(insn, regs, val);
 		break;
 	case INSN_MATCH_FLI_S:
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		val = GET_RS1_NUM(insn);
 		val = f32_imm_lut[val];
 		SET_F32_RD(insn, regs, val);
 		break;
 	case INSN_MATCH_FLI_D:
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		val = GET_RS1_NUM(insn);
 		val = f64_imm_lut[val];
 		SET_F64_RD(insn, regs, val);
 		break;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F32_RS1_OR_NAN(insn, regs);
 		val  = round_f32(val, &fcsr, GET_RM(insn), false);
@@ -740,6 +778,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUND_S | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -749,10 +788,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F32_RS1_OR_NAN(insn, regs);
 		val  = round_f32(val, &fcsr, GET_RM(insn), true);
@@ -760,6 +804,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_S | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -769,10 +814,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F64_RS1_OR_NAN(insn, regs);
 		val  = round_f64(val, &fcsr, GET_RM(insn), false);
@@ -780,6 +830,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUND_D | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -789,10 +840,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F64_RS1_OR_NAN(insn, regs);
 		val  = round_f64(val, &fcsr, GET_RM(insn), true);
@@ -800,6 +856,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_D | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -809,10 +866,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F16_RS1_OR_NAN(insn, regs);
 		val  = round_f16(val, &fcsr, GET_RM(insn), false);
@@ -820,6 +882,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUND_H | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -829,10 +892,15 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_RNE << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_RTZ << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_RDN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_RUP << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_RMM << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F16_RS1_OR_NAN(insn, regs);
 		val  = round_f16(val, &fcsr, GET_RM(insn), true);
@@ -840,6 +908,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FROUNDNX_H | (RM_FIELD_DYN << 12):
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		if ((fcsr & 0xe0) == 0xa0 || (fcsr & 0xe0) == 0xc0)
 			return truly_illegal_insn(insn, regs);
@@ -849,6 +918,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		SET_FCSR(fcsr);
 		break;
 	case INSN_MATCH_FCVTMOD_W_D:
+		matched_ext = SBI_INSN_EMU_EXT_ZFA;
 		fcsr = GET_FCSR();
 		val  = GET_F64_RS1_OR_NAN(insn, regs);
 		val  = (s64)fcvtmod_f64(val, &fcsr);
@@ -860,6 +930,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 		switch (insn & INSN_MASK_RTYPE_RD_RS1_RS2) {
 #ifdef CONFIG_EMU_ZFA
 		case INSN_MATCH_FMINM_H: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u16 rs1 = GET_F16_RS1_OR_NAN(insn, regs);
 			u16 rs2 = GET_F16_RS2_OR_NAN(insn, regs);
 			if (!(val = f16_handle_and_signal_nans(rs1, rs2)))
@@ -869,6 +940,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FMAXM_H: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u16 rs1 = GET_F16_RS1_OR_NAN(insn, regs);
 			u16 rs2 = GET_F16_RS2_OR_NAN(insn, regs);
 			if (!(val = f16_handle_and_signal_nans(rs1, rs2)))
@@ -878,6 +950,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FMINM_S: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u32 rs1 = GET_F32_RS1_OR_NAN(insn, regs);
 			u32 rs2 = GET_F32_RS2_OR_NAN(insn, regs);
 			if (!(val = f32_handle_and_signal_nans(rs1, rs2)))
@@ -887,6 +960,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FMAXM_S: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u32 rs1 = GET_F32_RS1_OR_NAN(insn, regs);
 			u32 rs2 = GET_F32_RS2_OR_NAN(insn, regs);
 			if (!(val = f32_handle_and_signal_nans(rs1, rs2)))
@@ -896,6 +970,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FMINM_D: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u64 rs1 = GET_F64_RS1_OR_NAN(insn, regs);
 			u64 rs2 = GET_F64_RS2_OR_NAN(insn, regs);
 			if (!(val = f64_handle_and_signal_nans(rs1, rs2)))
@@ -905,6 +980,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FMAXM_D: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u64 rs1 = GET_F64_RS1_OR_NAN(insn, regs);
 			u64 rs2 = GET_F64_RS2_OR_NAN(insn, regs);
 			if (!(val = f64_handle_and_signal_nans(rs1, rs2)))
@@ -914,6 +990,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLTQ_H: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u16 rs1 = GET_F16_RS1_OR_NAN(insn, regs);
 			u16 rs2 = GET_F16_RS2_OR_NAN(insn, regs);
 			if ((val = !f16_handle_and_signal_nans(rs1, rs2)))
@@ -922,6 +999,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLEQ_H: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u16 rs1 = GET_F16_RS1_OR_NAN(insn, regs);
 			u16 rs2 = GET_F16_RS2_OR_NAN(insn, regs);
 			if ((val = !f16_handle_and_signal_nans(rs1, rs2)))
@@ -930,6 +1008,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLTQ_S: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u32 rs1 = GET_F32_RS1_OR_NAN(insn, regs);
 			u32 rs2 = GET_F32_RS2_OR_NAN(insn, regs);
 			if ((val = !f32_handle_and_signal_nans(rs1, rs2)))
@@ -938,6 +1017,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLEQ_S: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u32 rs1 = GET_F32_RS1_OR_NAN(insn, regs);
 			u32 rs2 = GET_F32_RS2_OR_NAN(insn, regs);
 			if ((val = !f32_handle_and_signal_nans(rs1, rs2)))
@@ -946,6 +1026,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLTQ_D: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u64 rs1 = GET_F64_RS1_OR_NAN(insn, regs);
 			u64 rs2 = GET_F64_RS2_OR_NAN(insn, regs);
 			if ((val = !f64_handle_and_signal_nans(rs1, rs2)))
@@ -954,6 +1035,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 			break;
 		}
 		case INSN_MATCH_FLEQ_D: {
+			matched_ext = SBI_INSN_EMU_EXT_ZFA;
 			u64 rs1 = GET_F64_RS1_OR_NAN(insn, regs);
 			u64 rs2 = GET_F64_RS2_OR_NAN(insn, regs);
 			if ((val = !f64_handle_and_signal_nans(rs1, rs2)))
@@ -969,6 +1051,7 @@ int sbi_insn_emu_op_fp(ulong insn, struct sbi_trap_regs *regs)
 
 	regs->mepc += 4;
 
+	sbi_insn_emu_pmu_inc(matched_ext);
 	return 0;
 }
 #endif
