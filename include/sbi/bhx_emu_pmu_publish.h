@@ -36,12 +36,32 @@
 /* "BPMU" stored little-endian. The host validates this byte-for-byte
  * before trusting the rest of the struct. */
 #define BHX_EMU_PMU_MAGIC	0x554d5042u
-#define BHX_EMU_PMU_VERSION	3u
+#define BHX_EMU_PMU_VERSION	4u
 
 /* Upper bound on hartid we track. X280 has 1 hart per L2CPU so a
  * given firmware image only ever sees hartid == 0; sized generously
  * so a future multi-hart platform doesn't truncate. */
 #define BHX_EMU_PMU_MAX_HARTS	8
+
+/* Per-hart capacity of the unhandled-insn dedup table. 32 unique
+ * encodings is roomy: a workload doing dozens of distinct unhandled
+ * trap kinds at once is already extraordinary, and the table dedupes
+ * by encoding (not by PC) so a single insn hit from N call sites
+ * still consumes one slot. Overflow drops new encodings into an
+ * `overflow` counter rather than evicting existing entries — the
+ * first-seen N kinds are sticky for the boot. */
+#define BHX_EMU_PMU_UNHANDLED_TABLE_SIZE	32
+
+/* One slot in the unhandled-insn table. `insn == 0` is the empty
+ * sentinel — no encoding the emulator could see legitimately has
+ * encoding zero (an all-zero word is a valid compressed `c.illegal`
+ * but it's caught by base RVI before reaching truly_illegal_insn,
+ * which is fine). */
+struct bhx_emu_pmu_unhandled_entry {
+	u64	insn;		/* trapped instruction encoding */
+	u64	first_mepc;	/* PC of the first occurrence this boot */
+	u64	count;		/* total hits across all PCs */
+};
 
 struct bhx_emu_pmu_publish {
 	u32	magic;		/* BHX_EMU_PMU_MAGIC */
@@ -80,6 +100,23 @@ struct bhx_emu_pmu_publish {
 	 * than "ever since this fw_jump.bin loaded." */
 	u64	first_unhandled_insn[BHX_EMU_PMU_MAX_HARTS];
 	u64	first_unhandled_mepc[BHX_EMU_PMU_MAX_HARTS];
+
+	/* Per-hart dedup table of all unique encodings the emulator
+	 * couldn't handle this boot. Dedup is by `insn` only (not by
+	 * PC): a single insn hit from many call sites still consumes
+	 * one entry, with `first_mepc` recording one example PC for
+	 * the operator to cross-reference. Sorted-by-count display
+	 * happens host-side. */
+	struct bhx_emu_pmu_unhandled_entry
+		unhandled_table[BHX_EMU_PMU_MAX_HARTS][BHX_EMU_PMU_UNHANDLED_TABLE_SIZE];
+
+	/* Per-hart count of unhandled traps whose encoding didn't fit
+	 * in unhandled_table because all slots were taken by other
+	 * encodings. Non-zero here means the operator is seeing more
+	 * than BHX_EMU_PMU_UNHANDLED_TABLE_SIZE distinct unhandled
+	 * encodings — the table needs to grow, or the table covers
+	 * "most" but not "all" of what's failing. */
+	u64	unhandled_overflow[BHX_EMU_PMU_MAX_HARTS];
 };
 
 extern struct bhx_emu_pmu_publish bhx_emu_pmu_publish;

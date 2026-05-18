@@ -190,30 +190,66 @@ int sbi_insn_emu_pmu_init(void)
 			bhx_emu_pmu_publish.ctr_to_event[hartid][i] = 0;
 		bhx_emu_pmu_publish.first_unhandled_insn[hartid] = 0;
 		bhx_emu_pmu_publish.first_unhandled_mepc[hartid] = 0;
+		for (i = 0; i < BHX_EMU_PMU_UNHANDLED_TABLE_SIZE; i++) {
+			bhx_emu_pmu_publish.unhandled_table[hartid][i].insn = 0;
+			bhx_emu_pmu_publish.unhandled_table[hartid][i].first_mepc = 0;
+			bhx_emu_pmu_publish.unhandled_table[hartid][i].count = 0;
+		}
+		bhx_emu_pmu_publish.unhandled_overflow[hartid] = 0;
 	}
 	sbi_pmu_set_device(&bhx_emu_pmu);
 	return 0;
 }
 
 /*
- * Capture the first-unhandled instruction encoding for this hart.
- * Called from truly_illegal_insn() right after the UNHANDLED bump.
+ * Capture the unhandled instruction in two places:
  *
- * "First" rather than "last" because the operator's most common
- * question is "which insn killed my boot" — and once a critical
- * tool crashes, the kernel may cascade through dozens more SIGILLs
- * on cleanup paths that aren't the root cause. We write only when
- * the slot is still zero. Reset by sbi_insn_emu_pmu_init() so it
- * reflects "this boot."
+ *  - `first_unhandled_*[hartid]` — the very first trap this boot.
+ *    Sticky once set so cascading SIGILLs don't overwrite the
+ *    root cause.
+ *
+ *  - `unhandled_table[hartid][...]` — a per-hart dedup table of
+ *    *all* unique encodings the emulator couldn't handle this
+ *    boot. Dedup is by `insn` only (not by PC) so a single
+ *    encoding hit from many call sites consumes one entry — the
+ *    operator's question "what kinds of insns are missing" gets
+ *    a clean N-row histogram even on the busiest workload.
+ *
+ * The table is small enough (32 entries × 1 hart in practice) that
+ * a linear scan per trap is cheap relative to the M-mode trap
+ * round-trip we're already paying. When the table fills up, new
+ * encodings increment unhandled_overflow[hartid] instead of
+ * evicting existing entries: the first N kinds we saw are sticky,
+ * which is what the operator's debug workflow wants.
  */
 void sbi_insn_emu_pmu_capture_unhandled(ulong insn, ulong mepc)
 {
 	u32 hartid = current_hartid();
+	struct bhx_emu_pmu_unhandled_entry *table;
+	int i, empty_slot = -1;
 
 	if (hartid >= BHX_EMU_PMU_MAX_HARTS)
 		return;
-	if (bhx_emu_pmu_publish.first_unhandled_insn[hartid] != 0)
-		return;
-	bhx_emu_pmu_publish.first_unhandled_insn[hartid] = insn;
-	bhx_emu_pmu_publish.first_unhandled_mepc[hartid] = mepc;
+
+	if (bhx_emu_pmu_publish.first_unhandled_insn[hartid] == 0) {
+		bhx_emu_pmu_publish.first_unhandled_insn[hartid] = insn;
+		bhx_emu_pmu_publish.first_unhandled_mepc[hartid] = mepc;
+	}
+
+	table = bhx_emu_pmu_publish.unhandled_table[hartid];
+	for (i = 0; i < BHX_EMU_PMU_UNHANDLED_TABLE_SIZE; i++) {
+		if (table[i].insn == insn) {
+			table[i].count++;
+			return;
+		}
+		if (table[i].insn == 0 && empty_slot < 0)
+			empty_slot = i;
+	}
+	if (empty_slot >= 0) {
+		table[empty_slot].insn = insn;
+		table[empty_slot].first_mepc = mepc;
+		table[empty_slot].count = 1;
+	} else {
+		bhx_emu_pmu_publish.unhandled_overflow[hartid]++;
+	}
 }
